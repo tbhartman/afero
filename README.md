@@ -13,17 +13,80 @@ modifications are made:
   * tests removed
     - allfiles ending `_test.go`, as well as `gcs_mocks.go`
 	- count on afero to do the testing
-  * `util` package created
-    - moves most utility functions here
-	- file `util/afero.go` contains limited import of main afero interfaces
-	- file `unionFile.go` split and `copy*` functions moved to `util`
+  * `full` package created
+    - all of afero moved here except that related to `MemMapFs` and `HttpFs`
   * `mem` package now contains `NewMemMapFs`
   * `httpfs` package created, with `NewHttpFs` moved here
 
 Thus, the root package only defines the interfaces and allows using
-the OsFs via `NewOsFs`.  Use `httpfs`, knowing that `net/http` will be imported
-and increase binary size unless you need it.  Use `util` for all
+the OsFs via `NewOsFs`.  This should keep the amount of imported code to
+a bare minimum if all you need is to abstract `os` usage.
+Use `httpfs`, knowing that `net/http` will be imported
+and increase binary size unless you need it.  Use `full` for all
 other afero utilities.
+
+Usage
+-----
+
+The top-level package is simply named `afero`:
+
+```go
+package main
+
+import "github.com/tbhartman/afero-lite"
+
+func main() {
+	var myfs afero.Fs
+	myfs = afero.NewOsFs()
+	myfs.Stat("myfile")
+}
+```
+
+If you need other functionality, import from `full`, and use
+as `afero`:
+
+```go
+package main
+
+import (
+	"github.com/tbhartman/afero-lite/full"
+)
+
+func main() {
+	var myfs afero.Fs
+	myfs = afero.NewOsFs()
+	myfs = afero.NewBasePath(myfs, "basepath")
+	myfs.Stat("myfile")
+}
+```
+
+If you need a `MemMapFs`, import from `mem`:
+
+```go
+package main
+
+import (
+	"github.com/tbhartman/afero-lite/mem"
+)
+
+func main() {
+	_ = mem.NewMemMapFs()
+}
+```
+
+If you need a `HttpFs`, import from `httpfs`:
+
+```go
+package main
+
+import (
+	"github.com/tbhartman/afero-lite/httpfs"
+)
+
+func main() {
+	_ = httpfs.NewHttpFs()
+}
+```
 
 Versioning
 ----------
@@ -37,13 +100,21 @@ Update instructions
 This is all manual right now :(
 
  * remove `_test.go` and `mock.go` files
- * create `httpfs` and `util` directories
- * split `FilePathSeparator` from `util.go` and put remaining in `util`
- * split `copy*` functions from `unionFile.go` and put in `util`
+ * create `httpfs` and `full` directories
  * move `httpfs.go` to `httpfs`
  * move `memmap.go` to `mem`
- * move all other root go files to `util`
- * rename packages accordingly (from `package afero`)
- * add `afero.go` to `util` and define interfaces from root
-   - e.g. `var Fs = afero.Fs`
- * fix build errors (e.g. `httpfs.go` and `memmap.go` will need `afero.` prefixes for interfaces)
+ * move all other root go files to `full`
+ * copy back some files to root:
+   - `afero.go`
+   - `const_bsds.go`
+   - `const_win_unix.go`
+   - `lstater.go`
+   - `os.go`
+   - `symlink.go`
+   - `unionFile.go`
+   - `util.go`
+ * keep only `FilePathSeparator` in root `util.go`
+ * remove `copy*` functions from root `unionFile.go`
+ * fix build errors
+   - `httpfs.go` will need to import and use `afero`
+   - `memmap.go` will need to import and use `afero`

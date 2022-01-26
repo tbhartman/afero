@@ -1,4 +1,4 @@
-package util
+package afero
 
 import (
 	"io"
