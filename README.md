@@ -6,7 +6,7 @@ A *lightweight* FileSystem Abstraction System for Go
 Modifications
 -------------
 
-This is [afero]("github.com/spf13/afero"), reorganized to avoid
+This is [afero](http://github.com/spf13/afero), reorganized to avoid
 bloated binaries when a subset of features is used.  The following
 modifications are made:
 
