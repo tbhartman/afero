@@ -104,7 +104,7 @@ This is all manual right now :(
  * move `httpfs.go` to `httpfs`
  * move `memmap.go` to `mem`
  * move all other root go files to `full`
- * copy back some files to root:
+ * move some files to `definition`:
    - `afero.go`
    - `const_bsds.go`
    - `const_win_unix.go`
@@ -113,8 +113,17 @@ This is all manual right now :(
    - `symlink.go`
    - `unionFile.go`
    - `util.go`
- * keep only `FilePathSeparator` in root `util.go`
- * remove `copy*` functions from root `unionFile.go`
+ * remove `Afero` in `definition/afero.go`, put rest in `full/afero.go`
+ * keep only `FilePathSeparator` in `definition/util.go`, put rest in `full/util.go`
+ * remove `copy*` functions from `definition/unionFile.go`, put in `full/unionFile.go`
+ * create `afero.go` at root:
+   - package is `afero`
+   - add import of `definition` as `afero`
+   - add aliases from `definition`:
+     - `go doc -short ./definition | sed 's/^ *\(\w\+\) \(\w\+\).*/\1 \2 = afero.\2/' | sed 's/^func/var/' >> afero.go`
+   - format via `go fmt afero.go`
+ * copy `afero.go` to `full/definition.go`
  * fix build errors
+   - `go doc` currently misses some `Err*` defs
    - `httpfs.go` will need to import and use `afero`
    - `memmap.go` will need to import and use `afero`
