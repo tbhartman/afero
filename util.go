@@ -25,9 +25,13 @@ import (
 	"strings"
 	"unicode"
 
+	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
 )
+
+// Filepath separator defined by os.Separator.
+const FilePathSeparator = string(filepath.Separator)
 
 // Takes a reader and a path and writes the content
 func (a Afero) WriteReader(path string, r io.Reader) (err error) {
@@ -39,7 +43,7 @@ func WriteReader(fs Fs, path string, r io.Reader) (err error) {
 	ospath := filepath.FromSlash(dir)
 
 	if ospath != "" {
-		err = fs.MkdirAll(ospath, 0777) // rwx, rw, r
+		err = fs.MkdirAll(ospath, 0o777) // rwx, rw, r
 		if err != nil {
 			if err != os.ErrExist {
 				return err
@@ -67,7 +71,7 @@ func SafeWriteReader(fs Fs, path string, r io.Reader) (err error) {
 	ospath := filepath.FromSlash(dir)
 
 	if ospath != "" {
-		err = fs.MkdirAll(ospath, 0777) // rwx, rw, r
+		err = fs.MkdirAll(ospath, 0o777) // rwx, rw, r
 		if err != nil {
 			return
 		}
@@ -120,7 +124,7 @@ func GetTempDir(fs Fs, subPath string) string {
 			return addSlash(dir)
 		}
 
-		err := fs.MkdirAll(dir, 0777)
+		err := fs.MkdirAll(dir, 0o777)
 		if err != nil {
 			panic(err)
 		}
@@ -155,14 +159,10 @@ func UnicodeSanitize(s string) string {
 
 // Transform characters with accents into plain forms.
 func NeuterAccents(s string) string {
-	t := transform.Chain(norm.NFD, transform.RemoveFunc(isMn), norm.NFC)
+	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
 	result, _, _ := transform.String(t, string(s))
 
 	return result
-}
-
-func isMn(r rune) bool {
-	return unicode.Is(unicode.Mn, r) // Mn: nonspacing marks
 }
 
 func (a Afero) FileContainsBytes(filename string, subslice []byte) (bool, error) {
@@ -197,7 +197,6 @@ func FileContainsAnyBytes(fs Fs, filename string, subslices [][]byte) (bool, err
 
 // readerContains reports whether any of the subslices is within r.
 func readerContainsAny(r io.Reader, subslices ...[]byte) bool {
-
 	if r == nil || len(subslices) == 0 {
 		return false
 	}
@@ -296,6 +295,9 @@ func IsEmpty(fs Fs, path string) (bool, error) {
 		}
 		defer f.Close()
 		list, err := f.Readdir(-1)
+		if err != nil {
+			return false, err
+		}
 		return len(list) == 0, nil
 	}
 	return fi.Size() == 0, nil

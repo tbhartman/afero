@@ -11,10 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package mem
+package afero
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -22,28 +23,28 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tbhartman/afero-lite"
+	"github.com/tbhartman/afero-lite/mem"
 )
 
 const chmodBits = os.ModePerm | os.ModeSetuid | os.ModeSetgid | os.ModeSticky // Only a subset of bits are allowed to be changed. Documented under os.Chmod()
 
 type MemMapFs struct {
 	mu   sync.RWMutex
-	data map[string]*FileData
+	data map[string]*mem.FileData
 	init sync.Once
 }
 
-func NewMemMapFs() afero.Fs {
+func NewMemMapFs() Fs {
 	return &MemMapFs{}
 }
 
-func (m *MemMapFs) getData() map[string]*FileData {
+func (m *MemMapFs) getData() map[string]*mem.FileData {
 	m.init.Do(func() {
-		m.data = make(map[string]*FileData)
+		m.data = make(map[string]*mem.FileData)
 		// Root should always exist, right?
 		// TODO: what about windows?
-		root := CreateDir(FilePathSeparator)
-		SetMode(root, os.ModeDir|0755)
+		root := mem.CreateDir(FilePathSeparator)
+		mem.SetMode(root, os.ModeDir|0o755)
 		m.data[FilePathSeparator] = root
 	})
 	return m.data
@@ -51,14 +52,14 @@ func (m *MemMapFs) getData() map[string]*FileData {
 
 func (*MemMapFs) Name() string { return "MemMapFS" }
 
-func (m *MemMapFs) Create(name string) (afero.File, error) {
+func (m *MemMapFs) Create(name string) (File, error) {
 	name = normalizePath(name)
 	m.mu.Lock()
-	file := CreateFile(name)
+	file := mem.CreateFile(name)
 	m.getData()[name] = file
 	m.registerWithParent(file, 0)
 	m.mu.Unlock()
-	return NewFileHandle(file), nil
+	return mem.NewFileHandle(file), nil
 }
 
 func (m *MemMapFs) unRegisterWithParent(fileName string) error {
@@ -72,12 +73,12 @@ func (m *MemMapFs) unRegisterWithParent(fileName string) error {
 	}
 
 	parent.Lock()
-	RemoveFromMemDir(parent, f)
+	mem.RemoveFromMemDir(parent, f)
 	parent.Unlock()
 	return nil
 }
 
-func (m *MemMapFs) findParent(f *FileData) *FileData {
+func (m *MemMapFs) findParent(f *mem.FileData) *mem.FileData {
 	pdir, _ := filepath.Split(f.Name())
 	pdir = filepath.Clean(pdir)
 	pfile, err := m.lockfreeOpen(pdir)
@@ -87,7 +88,7 @@ func (m *MemMapFs) findParent(f *FileData) *FileData {
 	return pfile
 }
 
-func (m *MemMapFs) registerWithParent(f *FileData, perm os.FileMode) {
+func (m *MemMapFs) registerWithParent(f *mem.FileData, perm os.FileMode) {
 	if f == nil {
 		return
 	}
@@ -96,19 +97,19 @@ func (m *MemMapFs) registerWithParent(f *FileData, perm os.FileMode) {
 		pdir := filepath.Dir(filepath.Clean(f.Name()))
 		err := m.lockfreeMkdir(pdir, perm)
 		if err != nil {
-			//log.Println("Mkdir error:", err)
+			// log.Println("Mkdir error:", err)
 			return
 		}
 		parent, err = m.lockfreeOpen(pdir)
 		if err != nil {
-			//log.Println("Open after Mkdir error:", err)
+			// log.Println("Open after Mkdir error:", err)
 			return
 		}
 	}
 
 	parent.Lock()
-	InitializeDir(parent)
-	AddToMemDir(parent, f)
+	mem.InitializeDir(parent)
+	mem.AddToMemDir(parent, f)
 	parent.Unlock()
 }
 
@@ -117,13 +118,13 @@ func (m *MemMapFs) lockfreeMkdir(name string, perm os.FileMode) error {
 	x, ok := m.getData()[name]
 	if ok {
 		// Only return ErrFileExists if it's a file, not a directory.
-		i := FileInfo{FileData: x}
+		i := mem.FileInfo{FileData: x}
 		if !i.IsDir() {
 			return ErrFileExists
 		}
 	} else {
-		item := CreateDir(name)
-		SetMode(item, os.ModeDir|perm)
+		item := mem.CreateDir(name)
+		mem.SetMode(item, os.ModeDir|perm)
 		m.getData()[name] = item
 		m.registerWithParent(item, perm)
 	}
@@ -142,8 +143,13 @@ func (m *MemMapFs) Mkdir(name string, perm os.FileMode) error {
 	}
 
 	m.mu.Lock()
-	item := CreateDir(name)
-	SetMode(item, os.ModeDir|perm)
+	// Dobule check that it doesn't exist.
+	if _, ok := m.getData()[name]; ok {
+		m.mu.Unlock()
+		return &os.PathError{Op: "mkdir", Path: name, Err: ErrFileExists}
+	}
+	item := mem.CreateDir(name)
+	mem.SetMode(item, os.ModeDir|perm)
 	m.getData()[name] = item
 	m.registerWithParent(item, perm)
 	m.mu.Unlock()
@@ -176,23 +182,23 @@ func normalizePath(path string) string {
 	}
 }
 
-func (m *MemMapFs) Open(name string) (afero.File, error) {
+func (m *MemMapFs) Open(name string) (File, error) {
 	f, err := m.open(name)
 	if f != nil {
-		return NewReadOnlyFileHandle(f), err
+		return mem.NewReadOnlyFileHandle(f), err
 	}
 	return nil, err
 }
 
-func (m *MemMapFs) openWrite(name string) (afero.File, error) {
+func (m *MemMapFs) openWrite(name string) (File, error) {
 	f, err := m.open(name)
 	if f != nil {
-		return NewFileHandle(f), err
+		return mem.NewFileHandle(f), err
 	}
 	return nil, err
 }
 
-func (m *MemMapFs) open(name string) (*FileData, error) {
+func (m *MemMapFs) open(name string) (*mem.FileData, error) {
 	name = normalizePath(name)
 
 	m.mu.RLock()
@@ -204,7 +210,7 @@ func (m *MemMapFs) open(name string) (*FileData, error) {
 	return f, nil
 }
 
-func (m *MemMapFs) lockfreeOpen(name string) (*FileData, error) {
+func (m *MemMapFs) lockfreeOpen(name string) (*mem.FileData, error) {
 	name = normalizePath(name)
 	f, ok := m.getData()[name]
 	if ok {
@@ -214,7 +220,7 @@ func (m *MemMapFs) lockfreeOpen(name string) (*FileData, error) {
 	}
 }
 
-func (m *MemMapFs) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
+func (m *MemMapFs) OpenFile(name string, flag int, perm os.FileMode) (File, error) {
 	perm &= chmodBits
 	chmod := false
 	file, err := m.openWrite(name)
@@ -229,10 +235,10 @@ func (m *MemMapFs) OpenFile(name string, flag int, perm os.FileMode) (afero.File
 		return nil, err
 	}
 	if flag == os.O_RDONLY {
-		file = NewReadOnlyFileHandle(file.(*File).Data())
+		file = mem.NewReadOnlyFileHandle(file.(*mem.File).Data())
 	}
 	if flag&os.O_APPEND > 0 {
-		_, err = file.Seek(0, os.SEEK_END)
+		_, err = file.Seek(0, io.SeekEnd)
 		if err != nil {
 			file.Close()
 			return nil, err
@@ -279,7 +285,7 @@ func (m *MemMapFs) RemoveAll(path string) error {
 	defer m.mu.RUnlock()
 
 	for p := range m.getData() {
-		if strings.HasPrefix(p, path) {
+		if p == path || strings.HasPrefix(p, path+FilePathSeparator) {
 			m.mu.RUnlock()
 			m.mu.Lock()
 			delete(m.getData(), p)
@@ -306,13 +312,25 @@ func (m *MemMapFs) Rename(oldname, newname string) error {
 		m.unRegisterWithParent(oldname)
 		fileData := m.getData()[oldname]
 		delete(m.getData(), oldname)
-		ChangeFileName(fileData, newname)
+		mem.ChangeFileName(fileData, newname)
 		m.getData()[newname] = fileData
 		m.registerWithParent(fileData, 0)
 		m.mu.Unlock()
 		m.mu.RLock()
 	} else {
 		return &os.PathError{Op: "rename", Path: oldname, Err: ErrFileNotFound}
+	}
+
+	for p, fileData := range m.getData() {
+		if strings.HasPrefix(p, oldname+FilePathSeparator) {
+			m.mu.RUnlock()
+			m.mu.Lock()
+			delete(m.getData(), p)
+			p := strings.Replace(p, oldname, newname, 1)
+			m.getData()[p] = fileData
+			m.mu.Unlock()
+			m.mu.RLock()
+		}
 	}
 	return nil
 }
@@ -327,7 +345,7 @@ func (m *MemMapFs) Stat(name string) (os.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	fi := GetFileInfo(f.(*File).Data())
+	fi := mem.GetFileInfo(f.(*mem.File).Data())
 	return fi, nil
 }
 
@@ -340,7 +358,7 @@ func (m *MemMapFs) Chmod(name string, mode os.FileMode) error {
 	if !ok {
 		return &os.PathError{Op: "chmod", Path: name, Err: ErrFileNotFound}
 	}
-	prevOtherBits := GetFileInfo(f).Mode() & ^chmodBits
+	prevOtherBits := mem.GetFileInfo(f).Mode() & ^chmodBits
 
 	mode = prevOtherBits | mode
 	return m.setFileMode(name, mode)
@@ -357,7 +375,7 @@ func (m *MemMapFs) setFileMode(name string, mode os.FileMode) error {
 	}
 
 	m.mu.Lock()
-	SetMode(f, mode)
+	mem.SetMode(f, mode)
 	m.mu.Unlock()
 
 	return nil
@@ -373,8 +391,8 @@ func (m *MemMapFs) Chown(name string, uid, gid int) error {
 		return &os.PathError{Op: "chown", Path: name, Err: ErrFileNotFound}
 	}
 
-	SetUID(f, uid)
-	SetGID(f, gid)
+	mem.SetUID(f, uid)
+	mem.SetGID(f, gid)
 
 	return nil
 }
@@ -390,7 +408,7 @@ func (m *MemMapFs) Chtimes(name string, atime time.Time, mtime time.Time) error 
 	}
 
 	m.mu.Lock()
-	SetModTime(f, mtime)
+	mem.SetModTime(f, mtime)
 	m.mu.Unlock()
 
 	return nil
@@ -398,7 +416,7 @@ func (m *MemMapFs) Chtimes(name string, atime time.Time, mtime time.Time) error 
 
 func (m *MemMapFs) List() {
 	for _, x := range m.data {
-		y := FileInfo{FileData: x}
+		y := mem.FileInfo{FileData: x}
 		fmt.Println(x.Name(), y.Size())
 	}
 }
