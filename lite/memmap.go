@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tbhartman/afero-lite/mem"
+	"github.com/tbhartman/afero/mem"
 )
 
 const chmodBits = os.ModePerm | os.ModeSetuid | os.ModeSetgid | os.ModeSticky // Only a subset of bits are allowed to be changed. Documented under os.Chmod()

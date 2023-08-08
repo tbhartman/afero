@@ -1,4 +1,4 @@
-module github.com/tbhartman/afero-lite
+module github.com/tbhartman/afero
 
 require (
 	cloud.google.com/go/storage v1.14.0

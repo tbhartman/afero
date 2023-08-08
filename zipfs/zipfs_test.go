@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/tbhartman/afero-lite"
+	"github.com/tbhartman/afero/lite"
 )
 
 func TestZipFS(t *testing.T) {

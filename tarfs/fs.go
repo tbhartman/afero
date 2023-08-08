@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tbhartman/afero-lite"
+	"github.com/tbhartman/afero/lite"
 )
 
 type Fs struct {

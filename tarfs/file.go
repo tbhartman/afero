@@ -8,7 +8,7 @@ import (
 	"sort"
 	"syscall"
 
-	"github.com/tbhartman/afero-lite"
+	"github.com/tbhartman/afero/lite"
 )
 
 type File struct {

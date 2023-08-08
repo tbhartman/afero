@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package httpfs
+package afero
 
 import (
 	"errors"
@@ -21,8 +21,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/tbhartman/afero-lite"
 )
 
 type httpDir struct {
@@ -48,10 +46,10 @@ func (d httpDir) Open(name string) (http.File, error) {
 }
 
 type HttpFs struct {
-	source afero.Fs
+	source Fs
 }
 
-func NewHttpFs(source afero.Fs) *HttpFs {
+func NewHttpFs(source Fs) *HttpFs {
 	return &HttpFs{source: source}
 }
 
@@ -61,7 +59,7 @@ func (h HttpFs) Dir(s string) *httpDir {
 
 func (h HttpFs) Name() string { return "h HttpFs" }
 
-func (h HttpFs) Create(name string) (afero.File, error) {
+func (h HttpFs) Create(name string) (File, error) {
 	return h.source.Create(name)
 }
 
@@ -95,7 +93,7 @@ func (h HttpFs) Open(name string) (http.File, error) {
 	return nil, err
 }
 
-func (h HttpFs) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
+func (h HttpFs) OpenFile(name string, flag int, perm os.FileMode) (File, error) {
 	return h.source.OpenFile(name, flag, perm)
 }
 

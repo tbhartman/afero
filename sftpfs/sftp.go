@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/pkg/sftp"
-	"github.com/tbhartman/afero-lite"
+	"github.com/tbhartman/afero/lite"
 )
 
 // Fs is a afero.Fs implementation that uses functions provided by the sftp package.

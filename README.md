@@ -10,19 +10,21 @@ This is [afero](http://github.com/spf13/afero), reorganized to avoid bloated
 binaries when a subset of features is used (aka when `net/http` is not needed).
 The following modifications are made:
 
-  * `"github.com/spf13/afero` replaced with `"github.com/tbhartman/afero-lite`
-  * `httpfs` package created, with `httpFs.go` moved here
-    - need to import from base package for `Fs` and `File` definitions
+  * `"github.com/spf13/afero` replaced with `"github.com/tbhartman/afero/lite`
+  * all root go files are moved to a `lite` package, except for `httpFs.go`
+  * new aliases are created at the root level to reference exported symbols
+    in `lite`
 
 Usage
 -----
 
-The top-level package is simply named `afero`:
+Unless you need `NewHttpFs`, use the `lite` package, which is imported as
+`afero`.
 
 ```go
 package main
 
-import "github.com/tbhartman/afero-lite"
+import "github.com/tbhartman/afero/lite"
 
 func main() {
 	var myfs afero.Fs
@@ -31,19 +33,18 @@ func main() {
 }
 ```
 
-If you need `httpFs` functionality, import from `httpfs`:
+If you need `httpFs` functionality, import from root:
 
 ```go
 package main
 
 import (
-	"github.com/tbhartman/afero-lite"
-	"github.com/tbhartman/afero-lite/httpfs"
+	"github.com/tbhartman/afero"
 )
 
 func main() {
 	var myfs afero.Fs
-	myfs = httpfs.NewHttpFs(afero.NewMemMapFs())
+	myfs = afero.NewHttpFs(afero.NewMemMapFs())
 }
 ```
 

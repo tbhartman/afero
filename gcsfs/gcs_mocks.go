@@ -19,7 +19,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
-	"github.com/tbhartman/afero-lite"
+	"github.com/tbhartman/afero/lite"
 	"google.golang.org/api/iterator"
 )
 
