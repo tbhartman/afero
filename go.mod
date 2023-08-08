@@ -1,4 +1,4 @@
-module github.com/spf13/afero
+module github.com/tbhartman/afero
 
 require (
 	cloud.google.com/go/storage v1.14.0
